@@ -34,7 +34,7 @@ class _ChatScreenState extends State<ChatScreen> {
       listen: false,
     );
     final String currentEmail =
-        currentUser?.email ?? 'unknown@user.com'; // fallbacfinal authService = Provider.of<AuthService>(context);
+        currentUser?.email ?? 'unknown@user.com';
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, child) {
         return StreamBuilder<QuerySnapshot>(
@@ -45,7 +45,6 @@ class _ChatScreenState extends State<ChatScreen> {
               messagesList = snapshot.data!.docs
                   .map((doc) {
                 final data = doc.data() as Map<String, dynamic>;
-                // Optional: skip completely invalid docs
                 if (data[kMessage] == null && data['id'] == null) return null;
                 return Message.fromJson(data);
               })
@@ -88,7 +87,7 @@ class _ChatScreenState extends State<ChatScreen> {
                       onPressed: () async {
                         final shouldLogout = await _showLogoutDialog(context);
                         if (shouldLogout) {
-                          await _performLogout(authService, context);
+                          await _performLogout(AuthService(), context);
                         }
                       },
                     ),
