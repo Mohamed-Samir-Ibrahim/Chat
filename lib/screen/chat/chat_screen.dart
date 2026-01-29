@@ -1,5 +1,6 @@
 import 'package:chat_app/core/constant/app_constants.dart';
 import 'package:chat_app/core/model/message.dart';
+import 'package:chat_app/core/model/user_model.dart';
 import 'package:chat_app/screen/auth_screen.dart';
 import 'package:chat_app/shared/auth_service.dart';
 import 'package:chat_app/shared/theme_provider.dart';
@@ -10,7 +11,7 @@ import 'package:fluttertoast/fluttertoast.dart';
 import 'package:provider/provider.dart';
 
 class ChatScreen extends StatefulWidget {
-  ChatScreen({super.key});
+  const ChatScreen({super.key});
 
   static const String routeName = 'chat-screen';
 
@@ -28,8 +29,12 @@ class _ChatScreenState extends State<ChatScreen> {
 
   @override
   Widget build(BuildContext context) {
-    var email = ModalRoute.of(context)!.settings.arguments;
-    final authService = Provider.of<AuthService>(context);
+    final UserModel? currentUser = Provider.of<UserModel?>(
+      context,
+      listen: false,
+    );
+    final String currentEmail =
+        currentUser?.email ?? 'unknown@user.com'; // fallbacfinal authService = Provider.of<AuthService>(context);
     return Consumer<ThemeProvider>(
       builder: (context, themeProvider, child) {
         return StreamBuilder<QuerySnapshot>(
@@ -37,9 +42,15 @@ class _ChatScreenState extends State<ChatScreen> {
           builder: (context, snapshot) {
             if (snapshot.hasData) {
               List<Message> messagesList = [];
-              for (int i = 0; i < snapshot.data!.docs.length; i++) {
-                messagesList.add(Message.fromJson(snapshot.data!.docs[i]));
-              }
+              messagesList = snapshot.data!.docs
+                  .map((doc) {
+                final data = doc.data() as Map<String, dynamic>;
+                // Optional: skip completely invalid docs
+                if (data[kMessage] == null && data['id'] == null) return null;
+                return Message.fromJson(data);
+              })
+                  .whereType<Message>() // filters out nulls
+                  .toList();
               return Scaffold(
                 backgroundColor: themeProvider.backgroundColor,
                 appBar: AppBar(
@@ -92,7 +103,7 @@ class _ChatScreenState extends State<ChatScreen> {
                         controller: _scrollController,
                         itemCount: messagesList.length,
                         itemBuilder: (context, index) =>
-                            messagesList[index].id == email
+                        messagesList[index].id == currentEmail
                             ? CustomBubble(message: messagesList[index])
                             : CustomBubbleForFriends(
                                 message: messagesList[index],
@@ -110,12 +121,10 @@ class _ChatScreenState extends State<ChatScreen> {
                           ref.add({
                             kMessage: value,
                             kCreatedAt: DateTime.now(),
-                            'id': email,
+                            'id': currentEmail,
                           });
                           controller.clear();
-                          _scrollController.jumpTo(
-                            _scrollController.position.maxScrollExtent,
-                          );
+                          _scrollController.jumpTo(0.0,);
                         },
                         decoration: InputDecoration(
                           hintText: 'Send Message',
@@ -124,14 +133,10 @@ class _ChatScreenState extends State<ChatScreen> {
                               ref.add({
                                 kMessage: controller.text,
                                 kCreatedAt: DateTime.now(),
-                                'id': email,
+                                'id': currentEmail,
                               });
                               controller.clear();
-                              _scrollController.animateTo(
-                                _scrollController.position.maxScrollExtent,
-                                duration: const Duration(milliseconds: 300),
-                                curve: Curves.easeOut,
-                              );
+                              _scrollController.jumpTo(0.0);
                             },
                             icon: Icon(Icons.send),
                             color: Colors.green,
