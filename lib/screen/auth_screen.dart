@@ -447,59 +447,43 @@ class _AuthScreenState extends State<AuthScreen> {
                   height: 50,
                   child: CustomButton(
                     onPressed: () async {
-                      if (_formKey.currentState!.validate()) {
-                        setState(() {
-                          _isLoading = true;
-                        });
+                      if (_formKey.currentState?.validate() != true)
+                        return; // safe check, no !
 
-                        try {
-                          String fullPhone = _countryCode + _phoneNumber;
+                      if (!mounted) return;
+                      setState(() => _isLoading = true);
 
-                          UserModel? user = await authService
-                              .registerWithEmailAndPassword(
-                                name: _nameController.text,
-                                email: _emailController.text,
-                                password: _passwordController.text,
-                                phone: fullPhone,
-                              );
+                      try {
+                        String fullPhone = _countryCode + _phoneNumber;
+                        UserModel? user = await authService
+                            .registerWithEmailAndPassword(
+                          name: _nameController.text.trim(),
+                          email: _emailController.text.trim(),
+                          password: _passwordController.text.trim(),
+                          phone: fullPhone,
+                        );
 
-                          setState(() {
-                            _isLoading = false;
-                          });
+                        if (!mounted) return;
+                        setState(() => _isLoading = false);
 
-                          if (user != null) {
-                            Fluttertoast.showToast(
-                              msg: 'The account has been created successfully',
-                              toastLength: Toast.LENGTH_SHORT,
-                              gravity: ToastGravity.BOTTOM,
-                            );
-                            Navigator.pushNamedAndRemoveUntil(
-                              context,
-                              ChatScreen.routeName,
-                              (route) => false,
-                              arguments: _emailController.text,
-                            );
-                          } else {
-                            Fluttertoast.showToast(
-                              msg: 'Account creation failed',
-                              toastLength: Toast.LENGTH_SHORT,
-                              gravity: ToastGravity.BOTTOM,
-                              backgroundColor: Colors.red,
-                            );
-                          }
-                        } catch (e) {
-                          setState(() {
-                            _isLoading = false;
-                          });
+                        if (user != null) {
                           Fluttertoast.showToast(
-                            msg: 'Error: $e',
-                            toastLength: Toast.LENGTH_SHORT,
-                            gravity: ToastGravity.BOTTOM,
-                            backgroundColor: Colors.red,
+                              msg: 'The account has been created successfully');
+                          Navigator.pushNamedAndRemoveUntil(
+                            context,
+                            ChatScreen.routeName,
+                                (route) => false,
                           );
+                        } else {
+                          Fluttertoast.showToast(msg: 'Account creation failed',
+                              backgroundColor: Colors.red);
                         }
+                      } catch (e) {
+                        if (!mounted) return;
+                        setState(() => _isLoading = false);
+                        Fluttertoast.showToast(
+                            msg: 'Error: $e', backgroundColor: Colors.red);
                       }
-                      print('Password Hashed is ${_passwordController.text}');
                     },
                     child: _isLoading
                         ? CircularProgressIndicator(color: Colors.white)
