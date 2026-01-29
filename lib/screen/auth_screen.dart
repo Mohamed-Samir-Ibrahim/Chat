@@ -3,8 +3,10 @@ import 'package:chat_app/screen/chat/chat_screen.dart';
 import 'package:chat_app/shared/auth_service.dart';
 import 'package:chat_app/shared/custom_button.dart';
 import 'package:chat_app/shared/custom_text_form_field.dart';
+import 'package:chat_app/shared/encrypt_decrypt_service.dart';
 import 'package:chat_app/shared/secure_storage_service.dart';
 import 'package:chat_app/shared/theme_provider.dart';
+import 'package:encrypt/encrypt.dart';
 import 'package:flutter/material.dart';
 import 'package:fluttertoast/fluttertoast.dart';
 import 'package:intl_phone_field/intl_phone_field.dart';
@@ -234,71 +236,93 @@ class _AuthScreenState extends State<AuthScreen> {
                   height: 50,
                   child: CustomButton(
                     onPressed: () async {
-                      if (_loginFormKey.currentState!.validate()) {
-                        setState(() {
-                          _isLoading = true;
-                        });
-                        try {
-                          UserModel? user = await authService
-                              .signInWithEmailAndPassword(
-                                email: _loginEmailController.text,
-                                password: _loginPasswordController.text,
-                              );
-                          setState(() {
-                            _isLoading = false;
-                          });
+                      final formState = _loginFormKey.currentState;
+                      if (formState == null || !formState.validate()) {
+                        return;
+                      }
 
-                          if (user != null) {
-                            if (isChecked) {
-                              await SecureStorageService.storeEncryptedPassword(
-                                'saved_email',
-                                _loginEmailController.text,
-                              );
-                              await SecureStorageService.storeEncryptedPassword(
-                                'saved_password',
-                                _loginPasswordController.text,
-                              );
-                            } else {
-                              await SecureStorageService.storage.delete(
-                                key: 'saved_email',
-                              );
-                              await SecureStorageService.storage.delete(
-                                key: 'saved_password',
-                              );
-                            }
+                      if (!mounted) return;
+                      setState(() => _isLoading = true);
 
-                            Fluttertoast.showToast(
-                              msg: 'Login successful.',
-                              toastLength: Toast.LENGTH_SHORT,
-                              gravity: ToastGravity.BOTTOM,
+                      try {
+                        final String plainPassword = _loginPasswordController
+                            .text
+                            .trim();
+
+                        final String hashedForDebug =
+                            EncryptionService.hashPassword(plainPassword);
+                        print(
+                          'LOGIN: Password Hashed (debug): $hashedForDebug',
+                        );
+
+                        final Encrypted encrypted =
+                            EncryptionService.encryptAES(
+                              plainPassword,
+                              SecureStorageService.encryptionKey,
                             );
-                            Navigator.pushNamedAndRemoveUntil(
-                              context,
-                              ChatScreen.routeName,
-                              (route) => false,
-                              arguments: _loginEmailController.text,
+                        print(
+                          'LOGIN: Password Encrypted (debug, base64): ${encrypted.base64}',
+                        );
+
+                        UserModel?
+                        user = await authService.signInWithEmailAndPassword(
+                          email: _loginEmailController.text.trim(),
+                          password:
+                              plainPassword, // Use plain password for Firebase Auth
+                        );
+
+                        if (!mounted) return;
+                        setState(() => _isLoading = false);
+
+                        if (user != null) {
+                          if (isChecked) {
+                            await SecureStorageService.storeEncryptedPassword(
+                              'saved_email',
+                              _loginEmailController.text.trim(),
+                            );
+                            await SecureStorageService.storeEncryptedPassword(
+                              'saved_password',
+                              plainPassword,
                             );
                           } else {
-                            Fluttertoast.showToast(
-                              msg: 'login failed',
-                              toastLength: Toast.LENGTH_SHORT,
-                              gravity: ToastGravity.BOTTOM,
-                              backgroundColor: Colors.red,
+                            await SecureStorageService.storage.delete(
+                              key: 'saved_email',
+                            );
+                            await SecureStorageService.storage.delete(
+                              key: 'saved_password',
                             );
                           }
-                        } catch (e) {
-                          setState(() {
-                            _isLoading = false;
-                          });
+
                           Fluttertoast.showToast(
-                            msg: 'Error: $e',
+                            msg: 'Login successful.',
+                            toastLength: Toast.LENGTH_SHORT,
+                            gravity: ToastGravity.BOTTOM,
+                          );
+
+                          Navigator.pushNamedAndRemoveUntil(
+                            context,
+                            ChatScreen.routeName,
+                            (route) => false,
+                          );
+                        } else {
+                          Fluttertoast.showToast(
+                            msg: 'login failed',
                             toastLength: Toast.LENGTH_SHORT,
                             gravity: ToastGravity.BOTTOM,
                             backgroundColor: Colors.red,
                           );
                         }
+                      } catch (e) {
+                        if (!mounted) return;
+                        setState(() => _isLoading = false);
+
+                        Fluttertoast.showToast(
+                          msg: 'Error: $e',
+                          toastLength: Toast.LENGTH_SHORT,
+                          gravity: ToastGravity.BOTTOM,
+                          backgroundColor: Colors.red,
+                        );
                       }
-                      print('Password Hashed is ${_passwordController.text}');
                     },
                     child: Text(
                       'Login',
@@ -447,42 +471,53 @@ class _AuthScreenState extends State<AuthScreen> {
                   height: 50,
                   child: CustomButton(
                     onPressed: () async {
-                      if (_formKey.currentState?.validate() != true)
-                        return; // safe check, no !
+                      if (_formKey.currentState?.validate() != true) return;
 
                       if (!mounted) return;
                       setState(() => _isLoading = true);
 
                       try {
+                        final String plainPassword = _passwordController.text
+                            .trim();
+                        final String hashedForDebug =
+                            EncryptionService.hashPassword(plainPassword);
+                        print(
+                          'REGISTER: Password Hashed (debug): $hashedForDebug',
+                        );
                         String fullPhone = _countryCode + _phoneNumber;
                         UserModel? user = await authService
                             .registerWithEmailAndPassword(
-                          name: _nameController.text.trim(),
-                          email: _emailController.text.trim(),
-                          password: _passwordController.text.trim(),
-                          phone: fullPhone,
-                        );
+                              name: _nameController.text.trim(),
+                              email: _emailController.text.trim(),
+                              password: plainPassword,
+                              phone: fullPhone,
+                            );
 
                         if (!mounted) return;
                         setState(() => _isLoading = false);
 
                         if (user != null) {
                           Fluttertoast.showToast(
-                              msg: 'The account has been created successfully');
+                            msg: 'The account has been created successfully',
+                          );
                           Navigator.pushNamedAndRemoveUntil(
                             context,
                             ChatScreen.routeName,
-                                (route) => false,
+                            (route) => false,
                           );
                         } else {
-                          Fluttertoast.showToast(msg: 'Account creation failed',
-                              backgroundColor: Colors.red);
+                          Fluttertoast.showToast(
+                            msg: 'Account creation failed',
+                            backgroundColor: Colors.red,
+                          );
                         }
                       } catch (e) {
                         if (!mounted) return;
                         setState(() => _isLoading = false);
                         Fluttertoast.showToast(
-                            msg: 'Error: $e', backgroundColor: Colors.red);
+                          msg: 'Error: $e',
+                          backgroundColor: Colors.red,
+                        );
                       }
                     },
                     child: _isLoading

@@ -4,13 +4,13 @@ import 'package:flutter_secure_storage/flutter_secure_storage.dart';
 
 class SecureStorageService {
   static final storage = FlutterSecureStorage();
-  static final _encryptionKey = 'your-32-char-encryption-key-here';
+  static final encryptionKey = 'your-32-char-encryption-key-here';
 
   static Future<void> storeEncryptedPassword(
     String key,
     String password,
   ) async {
-    final encrypted = EncryptionService.encryptAES(password, _encryptionKey);
+    final encrypted = EncryptionService.encryptAES(password, encryptionKey);
     await storage.write(key: key, value: encrypted.base64);
   }
 
@@ -18,7 +18,7 @@ class SecureStorageService {
     final encryptedBase64 = await storage.read(key: key);
     if (encryptedBase64 != null) {
       final encrypted = Encrypted.fromBase64(encryptedBase64);
-      return EncryptionService.decryptAES(encrypted, _encryptionKey);
+      return EncryptionService.decryptAES(encrypted, encryptionKey);
     }
     return null;
   }
